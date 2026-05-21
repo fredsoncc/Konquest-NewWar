@@ -1,0 +1,6 @@
+{
+  "name": "Konquest",
+  "description": "Galactic Conquest strategy game based on KDE Konquest with touch controls, local pass-and-play, Wi-Fi multiplayer, and a simulated Bluetooth discovery mode.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
