@@ -43,11 +43,21 @@ jobs:
       - name: Capacitor Sync
         run: npx cap sync android
 
-      # 8. Dar permissão de execução ao script do Gradle no Linux
+      # 7. Configurar o Gradle utilizando a action oficial e habilitar caches robustos
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # 8. Regenerar o Gradle Wrapper para corrigir arquivos corrompidos (v8.2.1)
+      - name: Regenerate Gradle Wrapper
+        run: |
+          cd android
+          gradle wrapper --gradle-version 8.2.1
+
+      # 9. Dar permissão de execução ao script do Gradle no Linux
       - name: Grant Execute Permission to Gradlew
         run: chmod +x android/gradlew
 
-      # 9. Compilar a APK em modo Debug (pronta para instalar no celular)
+      # 10. Compilar a APK em modo Debug (pronta para instalar no celular)
       - name: Compile Debug APK
         run: |
           cd android
