@@ -1,1 +1,16 @@
 @import "tailwindcss";
+
+@keyframes twinkle {
+  0%, 100% {
+    opacity: 0.15;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.15);
+  }
+}
+
+.animate-twinkle {
+  animation: twinkle var(--twinkle-duration, 4s) infinite ease-in-out;
+}

@@ -1,7 +1,6 @@
 export enum GameMode {
   LOCAL_PASS_AND_PLAY = "local_pass_play",
   WIFI_MULTIPLAYER = "wifi_multiplayer",
-  SIMULATED_BLUETOOTH = "simulated_bluetooth",
   GEMINI_AI_CHALLENGE = "gemini_challenge"
 }
 

@@ -14,7 +14,7 @@ export function generatePlanets(count: number, width: number = 14, height: numbe
   const assignedCoordinates = new Set<string>();
 
   // Ensure minimum distance between planets to make map readable
-  const minDistance = 1.6;
+  const minDistance = 2.2;
 
   function isTooClose(x: number, y: number): boolean {
     for (const p of planets) {
@@ -115,9 +115,15 @@ export function simulateBattle(
   defenderCount: number,
   defenderKillRate: number
 ): BattleResult {
-  let A = attackerCount;
-  let D = defenderCount;
+  // Ensure we have sanitize integers and positive counts
+  let A = Math.max(0, Math.floor(attackerCount || 0));
+  let D = Math.max(0, Math.floor(defenderCount || 0));
   let rounds = 0;
+
+  // Safeguard battle percentages against NaN, negative, or complete zero variables 
+  // to avoid infinite mathematical stagnation
+  const aRate = isNaN(attackerKillRate) || attackerKillRate <= 0 ? 0.55 : Math.max(0.05, Math.min(0.95, attackerKillRate));
+  const dRate = isNaN(defenderKillRate) || defenderKillRate <= 0 ? 0.55 : Math.max(0.05, Math.min(0.95, defenderKillRate));
 
   while (A > 0 && D > 0) {
     rounds++;
@@ -126,14 +132,14 @@ export function simulateBattle(
 
     // Defender fires at attackers
     for (let i = 0; i < D; i++) {
-      if (Math.random() < defenderKillRate) {
+      if (Math.random() < dRate) {
         defenderHits++;
       }
     }
 
     // Attacker fires at defenders
     for (let i = 0; i < A; i++) {
-      if (Math.random() < attackerKillRate) {
+      if (Math.random() < aRate) {
         attackerHits++;
       }
     }

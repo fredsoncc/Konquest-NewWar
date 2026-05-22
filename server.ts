@@ -123,7 +123,9 @@ Responda rigorosamente em formato JSON que obedece ao seguinte esquema.
 
   try {
     const ai = getGemini();
-    const result = await ai.models.generateContent({
+    
+    // We race the API call with a 12-second timeout to handle overload or connection hangs gracefully
+    const apiCall = ai.models.generateContent({
       model: "gemini-3.5-flash",
       contents: statePrompt,
       config: {
@@ -154,12 +156,23 @@ Responda rigorosamente em formato JSON que obedece ao seguinte esquema.
       }
     });
 
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("Timeout de resposta da API Gemini excedeu o limite seguro de 12s")), 12000);
+    });
+
+    const result = await Promise.race([apiCall, timeoutPromise]);
+
     const parsed = JSON.parse(result.text || "{}");
     res.json(parsed);
 
   } catch (error: any) {
     // Elegant fallback if GEMINI API KEY is unconfigured or rate-limited
-    console.warn("Gemini API Error, executing high-quality local strategic CPU logic instead:", error?.message);
+    const isQuotaExceeded = error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === "RESOURCE_EXHAUSTED" || error?.message?.includes("quota") || error?.message?.includes("429");
+    if (isQuotaExceeded) {
+      console.warn("Gemini API Quota Limit Exceeded (429 RESOURCE_EXHAUSTED) - Executing high-quality local CPU logic instead.");
+    } else {
+      console.warn("Gemini API Error, executing high-quality local CPU logic instead:", error?.message || error);
+    }
     
     // CPU fallback logic
     const dispatch: any[] = [];
@@ -221,7 +234,9 @@ app.post("/api/multiplayer/create", (req, res) => {
 
   const initialPlayers = [hostPlayer];
   const count = planetsCount || (mapSize === "small" ? 10 : mapSize === "medium" ? 15 : 22);
-  const planets = generatePlanets(count, 14, 8, [hostPlayer, { id: "player-guest", name: "Guest Waiting", color: "rose", isHuman: true, isCPU: false, isGemini: false }]);
+  
+  // We initialize standard planets with just the host first (meaning neutral planets represent the rest)
+  const planets = generatePlanets(count, 14, 8, initialPlayers);
 
   const session: GameSession = {
     roomId,
@@ -266,14 +281,27 @@ app.post("/api/multiplayer/join", (req, res) => {
     return res.status(404).json({ error: "Sala estelar não encontrada." });
   }
 
-  if (session.status !== "lobby" || session.players.length >= 2) {
-    return res.status(400).json({ error: "A sala informada já está cheia ou em andamento." });
+  if (session.status !== "lobby") {
+    return res.status(400).json({ error: "A partida nesta sala já está em andamento." });
   }
 
+  if (session.players.length >= 6) {
+    return res.status(400).json({ error: "A sala estelar informada já está cheia (máximo 6 jogadores)." });
+  }
+
+  // Prevent duplicate names in lobby for easier matching
+  const hasNameConflict = session.players.some(p => p.name.toLowerCase() === playerName.toLowerCase());
+  const finalName = hasNameConflict ? `${playerName} #${session.players.length + 1}` : playerName;
+
+  // Let's choose a dynamic color that is not currently taken
+  const availableColors = ["rose", "cyan", "amber", "violet", "fuchsia", "emerald", "blue", "orange"];
+  const takenColors = session.players.map(p => p.color);
+  const nextColor = availableColors.find(c => !takenColors.includes(c)) || playerColor || "fuchsia";
+
   const guestPlayer: Player = {
-    id: "player-guest",
-    name: playerName || "Almirante",
-    color: playerColor || "fuchsia",
+    id: `player-guest-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    name: finalName || `Almirante ${session.players.length + 1}`,
+    color: nextColor,
     isHuman: true,
     isCPU: false,
     isGemini: false,
@@ -281,7 +309,6 @@ app.post("/api/multiplayer/join", (req, res) => {
   };
 
   session.players.push(guestPlayer);
-  session.status = "playing"; // Autostart game since we have 2 players!
   
   session.logs.unshift({
     id: `sys-${Date.now()}`,
@@ -289,13 +316,10 @@ app.post("/api/multiplayer/join", (req, res) => {
     type: "chat_message",
     playerName: "Sistema",
     playerColor: "text-amber-400",
-    message: `${guestPlayer.name} uniu-se à partida galáctica! Que os motores de dobra sejam ligados.`
+    message: `${guestPlayer.name} uniu-se à sala galáctica!`
   });
 
-  // Re-distribute planet ownerships so guest truly gets their home base set
-  session.planets = generatePlanets(session.planets.length, 14, 8, session.players);
-
-  res.json(session);
+  res.json({ session, playerId: guestPlayer.id });
 });
 
 // Get room status
@@ -305,6 +329,41 @@ app.get("/api/multiplayer/status/:roomId", (req, res) => {
   if (!session) {
     return res.status(404).json({ error: "Sala estelar não encontrada." });
   }
+  res.json(session);
+});
+
+// Start game from lobby
+app.post("/api/multiplayer/start/:roomId", (req, res) => {
+  const cleanId = req.params.roomId.toUpperCase().trim();
+  const { playerId } = req.body as { playerId: string };
+  const session = activeRooms[cleanId];
+
+  if (!session) {
+    return res.status(404).json({ error: "Sala não encontrada." });
+  }
+
+  if (playerId !== "player-host") {
+    return res.status(403).json({ error: "Apenas o hospedeiro da sala pode iniciar o game." });
+  }
+
+  if (session.players.length < 2) {
+    return res.status(400).json({ error: "É necessário ter pelo menos 2 jogadores conectados na sala para iniciar o game." });
+  }
+
+  session.status = "playing";
+
+  // Regenerate and distribute the planets symmetrically across the final configuration of players!
+  session.planets = generatePlanets(session.planets.length, 14, 8, session.players);
+
+  session.logs.unshift({
+    id: `sys-${Date.now()}`,
+    turn: 1,
+    type: "chat_message",
+    playerName: "Sistema",
+    playerColor: "text-amber-500",
+    message: "A gerência galáctica autorizou a ignição! Motores em força máxima."
+  });
+
   res.json(session);
 });
 
@@ -333,14 +392,21 @@ app.post("/api/multiplayer/submit-orders/:roomId", (req, res) => {
   }
   pendingOrders[cleanId][playerId] = fleets;
 
-  // Check if both multiplayer humans have submitted their moves
-  const humanIds = session.players.map(p => p.id);
-  const allReady = humanIds.every(id => session.submittedTurns.includes(id));
+  // We check which players are still in the game (not completely eliminated with no planets and no active fleets)
+  const activePlanetOwners = new Set(session.planets.map(p => p.ownerId).filter(Boolean));
+  const playersWithFleets = new Set(session.fleets.map(f => f.ownerId));
+  const activePlayers = session.players.filter(p => {
+    return activePlanetOwners.has(p.id) || playersWithFleets.has(p.id);
+  });
+  const requiredSubmissions = activePlayers.map(p => p.id);
+
+  // Check if all needed participants have submitted their turns
+  const allReady = requiredSubmissions.every(id => session.submittedTurns.includes(id));
 
   if (allReady) {
-    // Consolidate both fleets orders
+    // Consolidate all fleets orders from all connected players
     const combinedOrders: Fleet[] = [];
-    humanIds.forEach(id => {
+    session.players.map(p => p.id).forEach(id => {
       const orders = pendingOrders[cleanId][id] || [];
       combinedOrders.push(...orders);
     });
@@ -366,11 +432,29 @@ app.post("/api/multiplayer/submit-orders/:roomId", (req, res) => {
 
 // Leave or reset a room
 app.post("/api/multiplayer/leave/:roomId", (req, res) => {
+  const { playerId } = req.body as { playerId: string };
   const cleanId = req.params.roomId.toUpperCase().trim();
-  if (activeRooms[cleanId]) {
-    delete activeRooms[cleanId];
-    delete pendingOrders[cleanId];
+  const session = activeRooms[cleanId];
+
+  if (session) {
+    if (!playerId || playerId === "player-host") {
+      // If host leaves, delete the entire room
+      delete activeRooms[cleanId];
+      delete pendingOrders[cleanId];
+    } else {
+      // Remove this specific guest player
+      session.players = session.players.filter(p => p.id !== playerId);
+      session.logs.unshift({
+        id: `sys-${Date.now()}`,
+        turn: session.turn,
+        type: "chat_message",
+        playerName: "Sistema",
+        playerColor: "text-rose-400",
+        message: `O jogador desconectou-se ou retirou-se da sala.`
+      });
+    }
   }
+
   res.json({ success: true });
 });
 

@@ -1,0 +1,67 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch: # Permite rodar manualmente pelo GitHub se desejar
+
+jobs:
+  build:
+    name: Compilar APK (Android)
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Baixar o código do repositório
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Configurar o Node.js para instalar as dependências da Web
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-size: 'large'
+          node-version: 20
+          cache: 'npm'
+
+      # 3. Instalar dependências do projeto
+      - name: Install Dependencies
+        run: npm ci
+
+      # 4. Gerar os arquivos de build da Web (pasta dist)
+      - name: Build Web Application
+        run: npm run build
+
+      # 5. Configurar o JDK (Java Development Kit) 17 necessário para o Android
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # 6. Configurar o Gradle
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # 7. Sincronizar o build da Web com a pasta nativa do Android (Capacitor)
+      - name: Capacitor Sync
+        run: npx cap sync android
+
+      # 8. Dar permissão de execução ao script do Gradle no Linux
+      - name: Grant Execute Permission to Gradlew
+        run: chmod +x android/gradlew
+
+      # 9. Compilar a APK em modo Debug (pronta para instalar no celular)
+      - name: Compile Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      # 10. Encontrar e salvar a APK como artefato de download no GitHub Actions
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Konquest-NewWar-Debug-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7

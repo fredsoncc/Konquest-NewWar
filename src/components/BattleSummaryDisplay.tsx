@@ -33,6 +33,11 @@ export function BattleSummaryDisplay({ battles, onDismiss, turnNumber }: BattleS
       case "cyan": return "bg-cyan-500/10 border-cyan-500/20";
       case "amber": return "bg-amber-500/10 border-amber-500/20";
       case "violet": return "bg-violet-500/10 border-violet-500/20";
+      case "fuchsia": return "bg-fuchsia-500/10 border-fuchsia-500/20";
+      case "blue": return "bg-blue-500/10 border-blue-500/20";
+      case "orange": return "bg-orange-500/10 border-orange-500/20";
+      case "lime": return "bg-lime-500/10 border-lime-500/20";
+      case "pink": return "bg-pink-500/10 border-pink-500/20";
       default: return "bg-slate-900/60 border-slate-800";
     }
   };
@@ -44,6 +49,11 @@ export function BattleSummaryDisplay({ battles, onDismiss, turnNumber }: BattleS
       case "cyan": return "text-cyan-400";
       case "amber": return "text-amber-400";
       case "violet": return "text-violet-400";
+      case "fuchsia": return "text-fuchsia-400";
+      case "blue": return "text-blue-400";
+      case "orange": return "text-orange-400";
+      case "lime": return "text-lime-400";
+      case "pink": return "text-pink-400";
       default: return "text-slate-350";
     }
   };

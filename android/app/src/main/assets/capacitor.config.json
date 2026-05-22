@@ -1,0 +1,8 @@
+{
+	"appId": "com.fredsoncc.konquestnewwar",
+	"appName": "Konquest NewWar",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	}
+}
