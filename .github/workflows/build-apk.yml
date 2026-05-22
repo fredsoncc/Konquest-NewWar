@@ -44,7 +44,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          validate-wrappers: false
+          wrapper-validation-enabled: false
 
       # 7. Sincronizar o build da Web com a pasta nativa do Android (Capacitor)
       - name: Capacitor Sync
