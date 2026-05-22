@@ -33,13 +33,12 @@ jobs:
       - name: Build Web Application
         run: npm run build
 
-      # 5. Configurar o JDK (Java Development Kit) 17 necessário para o Android e fazer cache do Gradle
+      # 5. Configurar o JDK (Java Development Kit) 17 necessário para o Android
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
-          cache: 'gradle'
 
       # 6. Sincronizar o build da Web com a pasta nativa do Android (Capacitor)
       - name: Capacitor Sync
